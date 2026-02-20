@@ -39,7 +39,9 @@ data class HomeUiState(
     val userPreferences: UserPreferences = UserPreferences(),
     val dailyQuote: DailyQuote? = null,
     /** true olduğunda namaz vakitleri yüklenir; false iken izin ekranı gösterilir */
-    val permissionsGranted: Boolean = false
+    val permissionsGranted: Boolean = false,
+    /** Ardışık tamamlanmış namaz gün sayısı */
+    val prayerStreak: Int = 0
 )
 
 @HiltViewModel
@@ -83,6 +85,11 @@ class HomeViewModel @Inject constructor(
             prefsDataStore.userPreferences.collect { prefs ->
                 _uiState.update { it.copy(userPreferences = prefs) }
                 loadPrayerTimes(prefs)
+            }
+        }
+        viewModelScope.launch {
+            prefsDataStore.prayerStreak.collect { streak ->
+                _uiState.update { it.copy(prayerStreak = streak) }
             }
         }
     }

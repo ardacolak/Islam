@@ -4,12 +4,16 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -132,8 +136,14 @@ fun OnboardingScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Arka plan gradient (sayfaya göre değişir)
-        AnimatedGradientBackground(pages[pagerState.currentPage].gradient)
+        // Arka plan gradient — sayfa değişince crossfade ile geçiş
+        AnimatedContent(
+            targetState = pagerState.currentPage,
+            transitionSpec = { fadeIn(tween(500)) togetherWith fadeOut(tween(500)) },
+            label = "onboarding_bg"
+        ) { page ->
+            AnimatedGradientBackground(pages[page].gradient)
+        }
 
         Column(modifier = Modifier.fillMaxSize()) {
 
@@ -240,6 +250,13 @@ fun OnboardingScreen(
 
 @Composable
 private fun PageContent(page: OnboardingPage) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(page) {
+        visible = false
+        kotlinx.coroutines.delay(100)
+        visible = true
+    }
+
     Column(
         modifier            = Modifier
             .fillMaxSize()
@@ -248,54 +265,60 @@ private fun PageContent(page: OnboardingPage) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // İkon
-        Surface(
-            shape  = CircleShape,
-            color  = MaterialTheme.colorScheme.primaryContainer,
-            modifier = Modifier.size(112.dp)
+        // İkon — yukarıdan gelir
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 3 }
         ) {
-            Icon(
-                imageVector        = page.icon,
-                contentDescription = null,
-                modifier           = Modifier
-                    .padding(24.dp)
-                    .fillMaxSize(),
-                tint = MaterialTheme.colorScheme.primary
-            )
+            Surface(
+                shape  = CircleShape,
+                color  = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.size(112.dp)
+            ) {
+                Icon(
+                    imageVector        = page.icon,
+                    contentDescription = null,
+                    modifier           = Modifier
+                        .padding(24.dp)
+                        .fillMaxSize(),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
         }
 
         Spacer(Modifier.height(36.dp))
 
-        // Başlık
-        Text(
-            text      = page.title,
-            style     = MaterialTheme.typography.headlineMedium,
-            color     = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        // Alt başlık (Arapça vs.)
-        Text(
-            text      = page.subtitle,
-            style     = MaterialTheme.typography.titleMedium,
-            color     = MaterialTheme.colorScheme.secondary,
-            textAlign = TextAlign.Center,
-            fontWeight = FontWeight.SemiBold
-        )
-
-        Spacer(Modifier.height(20.dp))
-
-        // Açıklama
-        Text(
-            text      = page.description,
-            style     = MaterialTheme.typography.bodyMedium,
-            color     = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f),
-            textAlign = TextAlign.Center,
-            lineHeight = 22.sp
-        )
+        // Metin grubu — biraz gecikmeli gelir
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(tween(500, delayMillis = 100)) + slideInVertically(tween(500, delayMillis = 100)) { it / 3 }
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text      = page.title,
+                    style     = MaterialTheme.typography.headlineMedium,
+                    color     = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text      = page.subtitle,
+                    style     = MaterialTheme.typography.titleMedium,
+                    color     = MaterialTheme.colorScheme.secondary,
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    text      = page.description,
+                    style     = MaterialTheme.typography.bodyMedium,
+                    color     = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f),
+                    textAlign = TextAlign.Center,
+                    lineHeight = 22.sp
+                )
+            }
+        }
     }
 }
 

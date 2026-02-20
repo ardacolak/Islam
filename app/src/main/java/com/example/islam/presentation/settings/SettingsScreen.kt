@@ -17,22 +17,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.islam.core.i18n.LocalStrings
 import com.example.islam.core.util.BatteryOptimizationHelper
 
-// ─── Hesaplama metodu listesi (Aladhan method ID → kullanıcı dostu ad) ────────
+// ─── Dil seçenekleri ─────────────────────────────────────────────────────────
 
-private val calculationMethods = listOf(
-    2  to "ISNA (Kuzey Amerika)",
-    3  to "MWL (Dünya Müslümanlar Birliği)",
-    5  to "Egypt (Mısır Genel İdaresi)",
-    13 to "Diyanet İşleri Başkanlığı"
-)
-
-// ─── Mezhep / İkindi yöntemi listesi ─────────────────────────────────────────
-
-private val schoolOptions = listOf(
-    0 to "Şafii (Standart)",
-    1 to "Hanefi (İkindi geç başlar)"
+private val languageOptions = listOf(
+    "tr" to "Türkçe",
+    "en" to "English",
+    "ar" to "العربية"
 )
 
 // ─── Ana ekran ────────────────────────────────────────────────────────────────
@@ -41,6 +34,7 @@ private val schoolOptions = listOf(
 fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val state   by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val strings = LocalStrings.current
 
     val batteryExempted by produceState(initialValue = true, key1 = Unit) {
         value = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
@@ -56,7 +50,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     ) {
 
         Text(
-            text       = "Ayarlar",
+            text       = strings.settings,
             style      = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
@@ -64,19 +58,21 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
         // ── Pil Optimizasyonu Uyarı Kartı ─────────────────────────────────────
         if (!batteryExempted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             BatteryOptimizationCard(
-                explanation = BatteryOptimizationHelper.getExplanationText(),
-                onFixClick  = {
+                titleText       = strings.batteryOptActive,
+                buttonText      = strings.batteryOptFix,
+                explanation     = BatteryOptimizationHelper.getExplanationText(),
+                onFixClick      = {
                     BatteryOptimizationHelper.requestIgnoreBatteryOptimizations(context)
                 }
             )
         }
 
         // ── Konum Kartı ───────────────────────────────────────────────────────
-        SettingsCard(title = "Konum") {
+        SettingsCard(title = strings.location) {
             OutlinedTextField(
                 value         = state.cityInput,
                 onValueChange = viewModel::onCityInputChange,
-                label         = { Text("Şehir") },
+                label         = { Text(strings.city) },
                 singleLine    = true,
                 modifier      = Modifier.fillMaxWidth()
             )
@@ -84,7 +80,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             OutlinedTextField(
                 value         = state.countryInput,
                 onValueChange = viewModel::onCountryInputChange,
-                label         = { Text("Ülke") },
+                label         = { Text(strings.country) },
                 singleLine    = true,
                 modifier      = Modifier.fillMaxWidth()
             )
@@ -93,52 +89,58 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 onClick  = viewModel::saveLocation,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Kaydet")
+                Text(strings.save)
             }
         }
 
         // ── Hesaplama Metodu Dropdown ─────────────────────────────────────────
-        SettingsCard(title = "Hesaplama Metodu") {
+        SettingsCard(title = strings.calculationMethodTitle) {
             Text(
-                text  = "Namaz vakti hesaplama standardı",
+                text  = strings.calculationMethodDesc,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
             Spacer(Modifier.height(8.dp))
-
             SettingsDropdown(
-                label       = "Hesaplama Metodu",
-                options     = calculationMethods,
+                label       = strings.calculationMethodTitle,
+                options     = strings.calcMethods,
                 selectedId  = state.preferences.calculationMethod,
                 onSelected  = { viewModel.setCalculationMethod(it) }
             )
         }
 
         // ── Mezhep / İkindi Vakti Dropdown ───────────────────────────────────
-        SettingsCard(title = "Mezhep / İkindi Vakti") {
+        SettingsCard(title = strings.schoolTitle) {
             Text(
-                text  = "Hanefi mezhebinde ikindi vakti daha geç başlar",
+                text  = strings.schoolDesc,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
             Spacer(Modifier.height(8.dp))
-
             SettingsDropdown(
-                label       = "Mezhep",
-                options     = schoolOptions,
+                label       = strings.schoolTitle,
+                options     = strings.schoolOptions,
                 selectedId  = state.preferences.school,
                 onSelected  = { viewModel.setSchool(it) }
             )
         }
 
+        // ── Dil Seçici ────────────────────────────────────────────────────────
+        SettingsCard(title = strings.language) {
+            LanguageDropdown(
+                selectedCode = state.preferences.language,
+                onSelected   = { viewModel.setLanguage(it) }
+            )
+        }
+
         // ── Bildirimler Kartı ─────────────────────────────────────────────────
-        SettingsCard(title = "Bildirimler") {
+        SettingsCard(title = strings.notificationsTitle) {
             Row(
                 modifier              = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment     = Alignment.CenterVertically
             ) {
-                Text("Ezan Bildirimleri")
+                Text(strings.azanNotifications)
                 Switch(
                     checked         = state.preferences.notificationsEnabled,
                     onCheckedChange = viewModel::setNotifications
@@ -147,13 +149,13 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
         }
 
         // ── Görünüm Kartı ─────────────────────────────────────────────────────
-        SettingsCard(title = "Görünüm") {
+        SettingsCard(title = strings.appearance) {
             Row(
                 modifier              = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment     = Alignment.CenterVertically
             ) {
-                Text("Karanlık Tema")
+                Text(strings.darkTheme)
                 Switch(
                     checked         = state.preferences.darkTheme,
                     onCheckedChange = viewModel::setDarkTheme
@@ -162,6 +164,52 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
         }
 
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+// ─── Dil Dropdown ────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LanguageDropdown(
+    selectedCode: String,
+    onSelected: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedLabel = languageOptions.firstOrNull { it.first == selectedCode }?.second ?: ""
+    val strings = LocalStrings.current
+
+    ExposedDropdownMenuBox(
+        expanded         = expanded,
+        onExpandedChange = { expanded = it },
+        modifier         = Modifier.fillMaxWidth()
+    ) {
+        OutlinedTextField(
+            value         = selectedLabel,
+            onValueChange = {},
+            readOnly      = true,
+            label         = { Text(strings.language) },
+            trailingIcon  = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier      = Modifier
+                .fillMaxWidth()
+                .menuAnchor()
+        )
+
+        ExposedDropdownMenu(
+            expanded         = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            languageOptions.forEach { (code, name) ->
+                DropdownMenuItem(
+                    text    = { Text(name, style = MaterialTheme.typography.bodyMedium) },
+                    onClick = {
+                        onSelected(code)
+                        expanded = false
+                    },
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                )
+            }
+        }
     }
 }
 
@@ -216,6 +264,8 @@ private fun SettingsDropdown(
 
 @Composable
 private fun BatteryOptimizationCard(
+    titleText: String,
+    buttonText: String,
     explanation: String,
     onFixClick: () -> Unit
 ) {
@@ -236,7 +286,7 @@ private fun BatteryOptimizationCard(
                     tint               = MaterialTheme.colorScheme.onErrorContainer
                 )
                 Text(
-                    text       = "Pil Optimizasyonu Aktif",
+                    text       = titleText,
                     style      = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color      = MaterialTheme.colorScheme.onErrorContainer
@@ -269,7 +319,7 @@ private fun BatteryOptimizationCard(
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text       = "Pil Optimizasyonunu Kapat",
+                    text       = buttonText,
                     fontWeight = FontWeight.SemiBold
                 )
             }

@@ -3,7 +3,6 @@ package com.example.islam.utils
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.math.toRadians
 
 /**
  * Küresel trigonometri kullanarak Kıble yönünü hesaplar.
@@ -27,9 +26,9 @@ object QiblaCalculator {
      * @return Kuzeye göre saat yönünde Kıble açısı (0–360°)
      */
     fun calculateQiblaDirection(userLat: Double, userLng: Double): Float {
-        val φ1 = userLat.toRadians()
-        val φ2 = KAABA_LAT.toRadians()
-        val Δλ = (KAABA_LON - userLng).toRadians()
+        val φ1 = Math.toRadians(userLat)
+        val φ2 = Math.toRadians(KAABA_LAT)
+        val Δλ = Math.toRadians(KAABA_LON - userLng)
 
         val y = sin(Δλ) * cos(φ2)
         val x = cos(φ1) * sin(φ2) - sin(φ1) * cos(φ2) * cos(Δλ)

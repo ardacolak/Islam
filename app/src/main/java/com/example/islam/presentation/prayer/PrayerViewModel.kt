@@ -25,7 +25,8 @@ data class PrayerUiState(
     val prayerTime: PrayerTime? = null,
     val currentPrayer: Prayer? = null,
     val error: String? = null,
-    val userPreferences: UserPreferences = UserPreferences()
+    val userPreferences: UserPreferences = UserPreferences(),
+    val completedPrayers: Set<String> = emptySet()
 )
 
 @HiltViewModel
@@ -38,12 +39,28 @@ class PrayerViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(PrayerUiState())
     val uiState: StateFlow<PrayerUiState> = _uiState.asStateFlow()
 
+    // Kılınabilir namazlar (sabah akşam fark etmez, Güneş hariç)
+    private val trackablePrayers = listOf(
+        Prayer.FAJR, Prayer.DHUHR, Prayer.ASR, Prayer.MAGHRIB, Prayer.ISHA
+    ).map { it.name }
+
     init {
         viewModelScope.launch {
             prefsDataStore.userPreferences.collect { prefs ->
                 _uiState.update { it.copy(userPreferences = prefs) }
                 loadTodaysPrayers(prefs)
             }
+        }
+        viewModelScope.launch {
+            prefsDataStore.completedPrayersToday.collect { completed ->
+                _uiState.update { it.copy(completedPrayers = completed) }
+            }
+        }
+    }
+
+    fun togglePrayerCompleted(prayer: Prayer) {
+        viewModelScope.launch {
+            prefsDataStore.togglePrayerCompleted(prayer.name, trackablePrayers)
         }
     }
 

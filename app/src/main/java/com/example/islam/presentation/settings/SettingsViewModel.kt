@@ -67,4 +67,8 @@ class SettingsViewModel @Inject constructor(
     fun setSchool(school: Int) {
         viewModelScope.launch { prefsDataStore.updateSchool(school) }
     }
+
+    fun setLanguage(language: String) {
+        viewModelScope.launch { prefsDataStore.updateLanguage(language) }
+    }
 }

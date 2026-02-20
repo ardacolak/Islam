@@ -9,5 +9,6 @@ data class UserPreferences(
     val notificationsEnabled: Boolean = true,
     val useGps: Boolean = false,
     val darkTheme: Boolean = false,
-    val school: Int = 0                 // 0 = Şafii, 1 = Hanefi (İkindi/Asr vakti)
+    val school: Int = 0,                // 0 = Şafii, 1 = Hanefi (İkindi/Asr vakti)
+    val language: String = "tr"         // "tr" | "en" | "ar"
 )

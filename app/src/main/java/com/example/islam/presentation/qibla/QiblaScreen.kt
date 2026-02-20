@@ -1,8 +1,14 @@
 package com.example.islam.presentation.qibla
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,8 +26,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -31,17 +41,25 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.islam.core.i18n.LocalStrings
 import kotlin.math.cos
 import kotlin.math.sin
+
+private fun isAligned(bearingToQibla: Float) =
+    bearingToQibla < 5f || bearingToQibla > 355f
 
 @Composable
 fun QiblaScreen(viewModel: QiblaViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
+    val haptic = LocalHapticFeedback.current
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -54,9 +72,9 @@ fun QiblaScreen(viewModel: QiblaViewModel = hiltViewModel()) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Başlık
+            val strings = LocalStrings.current
             Text(
-                text = "Kıble Yönü",
+                text = strings.qiblaDirection,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
@@ -73,17 +91,11 @@ fun QiblaScreen(viewModel: QiblaViewModel = hiltViewModel()) {
             Spacer(modifier = Modifier.height(32.dp))
 
             when {
-                // Sensör yok
                 !uiState.hasSensor -> NoSensorMessage()
-
-                // Yükleniyor
-                uiState.isLoading -> CircularProgressIndicator()
-
-                // Pusula göster
+                uiState.isLoading  -> CircularProgressIndicator()
                 else -> {
                     val compass = uiState.compass!!
 
-                    // Animasyonlu azimut ve kıble açısı (titreme önleme)
                     val animatedAzimuth by animateFloatAsState(
                         targetValue = compass.azimuth,
                         animationSpec = spring(stiffness = Spring.StiffnessLow),
@@ -95,10 +107,34 @@ fun QiblaScreen(viewModel: QiblaViewModel = hiltViewModel()) {
                         label = "bearing"
                     )
 
-                    // Canvas pusula
+                    val aligned = isAligned(compass.bearingToQibla)
+
+                    // Haptik: hizalandığında titreşim ver (sadece bir kez, durum değişince)
+                    var wasAligned by remember { mutableStateOf(false) }
+                    LaunchedEffect(aligned) {
+                        if (aligned && !wasAligned) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        }
+                        wasAligned = aligned
+                    }
+
+                    // Hizalandığında yeşil parıltı (pulsing)
+                    val infiniteTransition = rememberInfiniteTransition(label = "qibla_glow")
+                    val glowAlpha by infiniteTransition.animateFloat(
+                        initialValue = 0.15f,
+                        targetValue = if (aligned) 0.45f else 0.15f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(800, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "glow_alpha"
+                    )
+
                     CompassCanvas(
                         azimuth = animatedAzimuth,
                         bearingToQibla = animatedBearing,
+                        aligned = aligned,
+                        glowAlpha = if (aligned) glowAlpha else 0f,
                         modifier = Modifier
                             .fillMaxWidth(0.85f)
                             .aspectRatio(1f)
@@ -106,12 +142,23 @@ fun QiblaScreen(viewModel: QiblaViewModel = hiltViewModel()) {
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Alt bilgi satırı
                     CompassInfoRow(
                         azimuth = compass.azimuth,
                         qiblaAngle = compass.qiblaAngle,
                         bearingToQibla = compass.bearingToQibla
                     )
+
+                    // Hizalama tebrik mesajı
+                    if (aligned) {
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            text = strings.qiblaAligned,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF2E7D32),
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }
@@ -119,34 +166,25 @@ fun QiblaScreen(viewModel: QiblaViewModel = hiltViewModel()) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Canvas Pusula
+// Canvas Pusula — glow efekti eklenmiş
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * İki katmanlı pusula Canvas'ı:
- *
- * **Katman 1 — Dönen pusula halkası** (`rotate(-azimuth)`):
- *   Kuzey her zaman fiziksel kuzeye işaret eder.
- *   Kırmızı-beyaz iğne (kırmızı uç = Kuzey) ve derecelere göre tik işaretleri içerir.
- *
- * **Katman 2 — Sabit Kıble oku** (döndürülmez):
- *   `bearingToQibla` açısında yeşil bir ok çizer.
- *   Kıble tam önde olduğunda ok yukarıyı gösterir.
- */
 @Composable
 private fun CompassCanvas(
     azimuth: Float,
     bearingToQibla: Float,
+    aligned: Boolean,
+    glowAlpha: Float,
     modifier: Modifier = Modifier
 ) {
-    val ringColor         = MaterialTheme.colorScheme.outline
-    val tickMajorColor    = MaterialTheme.colorScheme.onBackground
-    val tickMinorColor    = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
-    val northColor        = Color(0xFFD32F2F)   // Kuzey — kırmızı
-    val southColor        = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
-    val qiblaColor        = Color(0xFF2E7D32)   // Kıble — yeşil
-    val centerFillColor   = MaterialTheme.colorScheme.surfaceVariant
-    val labelColor        = MaterialTheme.colorScheme.onBackground
+    val ringColor      = MaterialTheme.colorScheme.outline
+    val tickMajorColor = MaterialTheme.colorScheme.onBackground
+    val tickMinorColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
+    val northColor     = Color(0xFFD32F2F)
+    val southColor     = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
+    val qiblaColor     = if (aligned) Color(0xFF1B5E20) else Color(0xFF2E7D32)
+    val centerFillColor = MaterialTheme.colorScheme.surfaceVariant
+    val labelColor     = MaterialTheme.colorScheme.onBackground
 
     Canvas(modifier = modifier) {
         val cx     = size.width / 2f
@@ -155,8 +193,6 @@ private fun CompassCanvas(
 
         // ── Katman 1: Dönen pusula ─────────────────────────────────────
         rotate(-azimuth, pivot = Offset(cx, cy)) {
-
-            // Dış halka
             drawCircle(
                 color  = ringColor,
                 radius = radius,
@@ -164,13 +200,11 @@ private fun CompassCanvas(
                 style  = Stroke(width = 3.dp.toPx())
             )
 
-            // Tik işaretleri (her 5°'de bir, majör = 30°)
             for (deg in 0 until 360 step 5) {
                 val isMajor = deg % 30 == 0
                 val rad     = Math.toRadians(deg.toDouble())
                 val len     = if (isMajor) 14.dp.toPx() else 6.dp.toPx()
                 val innerR  = radius - len
-
                 drawLine(
                     color       = if (isMajor) tickMajorColor else tickMinorColor,
                     start       = Offset(cx + innerR * sin(rad).toFloat(), cy - innerR * cos(rad).toFloat()),
@@ -179,29 +213,23 @@ private fun CompassCanvas(
                 )
             }
 
-            // Yön harfleri
             val labelRadius = radius - 28.dp.toPx()
             drawCardinalLabel(this, "K", 0f,   cx, cy, labelRadius, northColor)
             drawCardinalLabel(this, "D", 90f,  cx, cy, labelRadius, labelColor)
             drawCardinalLabel(this, "G", 180f, cx, cy, labelRadius, labelColor)
             drawCardinalLabel(this, "B", 270f, cx, cy, labelRadius, labelColor)
 
-            // Kuzey iğnesi — kırmızı üçgen
             drawCompassNeedle(
                 cx = cx, cy = cy,
                 northColor = northColor,
                 southColor = southColor,
                 needleLength = radius * 0.52f,
-                needleWidth = 10.dp.toPx()
+                needleWidth  = 10.dp.toPx()
             )
         }
 
-        // ── Ortadaki daire (iki katmanı ayırır) ───────────────────────
-        drawCircle(
-            color  = centerFillColor,
-            radius = 22.dp.toPx(),
-            center = Offset(cx, cy)
-        )
+        // ── Ortadaki daire ─────────────────────────────────────────────
+        drawCircle(color = centerFillColor, radius = 22.dp.toPx(), center = Offset(cx, cy))
         drawCircle(
             color  = ringColor,
             radius = 22.dp.toPx(),
@@ -209,11 +237,20 @@ private fun CompassCanvas(
             style  = Stroke(width = 2.dp.toPx())
         )
 
-        // ── Katman 2: Sabit Kıble oku (döndürülmez) ───────────────────
+        // ── Katman 2: Sabit Kıble oku ──────────────────────────────────
         val bearRad   = Math.toRadians(bearingToQibla.toDouble())
         val arrowLen  = radius * 0.58f
         val arrowEndX = cx + arrowLen * sin(bearRad).toFloat()
         val arrowEndY = cy - arrowLen * cos(bearRad).toFloat()
+
+        // Hizalandığında pulsing yeşil glow çemberi
+        if (glowAlpha > 0f) {
+            drawCircle(
+                color  = Color(0xFF2E7D32).copy(alpha = glowAlpha),
+                radius = 28.dp.toPx(),
+                center = Offset(arrowEndX, arrowEndY)
+            )
+        }
 
         // Ok gövdesi
         drawLine(
@@ -224,21 +261,12 @@ private fun CompassCanvas(
             cap         = StrokeCap.Round
         )
 
-        // Ok ucu (üçgen)
+        // Ok ucu
         val tipSize  = 12.dp.toPx()
         val perpRad  = bearRad + Math.PI / 2
-        val tipLeft  = Offset(
-            arrowEndX - tipSize * sin(perpRad).toFloat(),
-            arrowEndY + tipSize * cos(perpRad).toFloat()
-        )
-        val tipRight = Offset(
-            arrowEndX + tipSize * sin(perpRad).toFloat(),
-            arrowEndY - tipSize * cos(perpRad).toFloat()
-        )
-        val tipTop   = Offset(
-            arrowEndX + (tipSize * 1.6f) * sin(bearRad).toFloat(),
-            arrowEndY - (tipSize * 1.6f) * cos(bearRad).toFloat()
-        )
+        val tipLeft  = Offset(arrowEndX - tipSize * sin(perpRad).toFloat(), arrowEndY + tipSize * cos(perpRad).toFloat())
+        val tipRight = Offset(arrowEndX + tipSize * sin(perpRad).toFloat(), arrowEndY - tipSize * cos(perpRad).toFloat())
+        val tipTop   = Offset(arrowEndX + (tipSize * 1.6f) * sin(bearRad).toFloat(), arrowEndY - (tipSize * 1.6f) * cos(bearRad).toFloat())
         val arrowPath = Path().apply {
             moveTo(tipTop.x, tipTop.y)
             lineTo(tipLeft.x, tipLeft.y)
@@ -249,7 +277,7 @@ private fun CompassCanvas(
 
         // Kıble noktasındaki küçük halka
         drawCircle(
-            color  = qiblaColor.copy(alpha = 0.25f),
+            color  = qiblaColor.copy(alpha = if (aligned) 0.4f else 0.25f),
             radius = 16.dp.toPx(),
             center = Offset(arrowEndX, arrowEndY)
         )
@@ -260,13 +288,11 @@ private fun CompassCanvas(
 // Yardımcı çizim fonksiyonları
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Kuzey-Güney iğnesini çizer (kırmızı üst = kuzey). */
 private fun DrawScope.drawCompassNeedle(
     cx: Float, cy: Float,
     northColor: Color, southColor: Color,
     needleLength: Float, needleWidth: Float
 ) {
-    // Kuzey yarısı (kırmızı)
     val northPath = Path().apply {
         moveTo(cx, cy - needleLength)
         lineTo(cx - needleWidth / 2, cy)
@@ -275,7 +301,6 @@ private fun DrawScope.drawCompassNeedle(
     }
     drawPath(northPath, color = northColor)
 
-    // Güney yarısı (soluk)
     val southPath = Path().apply {
         moveTo(cx, cy + needleLength)
         lineTo(cx - needleWidth / 2, cy)
@@ -285,7 +310,6 @@ private fun DrawScope.drawCompassNeedle(
     drawPath(southPath, color = southColor)
 }
 
-/** Belirli bir pusula açısına harf etiketi çizer. */
 private fun drawCardinalLabel(
     scope: DrawScope,
     label: String,
@@ -300,12 +324,10 @@ private fun drawCardinalLabel(
 
     scope.drawContext.canvas.nativeCanvas.apply {
         val paint = android.graphics.Paint().apply {
-            this.color        = color.hashCode()
-            textSize          = 36f
-            textAlign         = android.graphics.Paint.Align.CENTER
-            isFakeBoldText    = true
+            textSize       = 36f
+            textAlign      = android.graphics.Paint.Align.CENTER
+            isFakeBoldText = true
         }
-        // Kuzey harfini kırmızı yap
         paint.color = if (angleDeg == 0f)
             android.graphics.Color.rgb(211, 47, 47)
         else
@@ -328,16 +350,17 @@ private fun CompassInfoRow(
     qiblaAngle: Float,
     bearingToQibla: Float
 ) {
+    val strings = LocalStrings.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        InfoCell(label = "Yön", value = "${azimuth.toInt()}°")
-        InfoCell(label = "Kıble", value = "${qiblaAngle.toInt()}°")
+        InfoCell(label = strings.direction, value = "${azimuth.toInt()}°")
+        InfoCell(label = strings.qibla,     value = "${qiblaAngle.toInt()}°")
         InfoCell(
-            label = "Sapma",
-            value = "${bearingToQibla.toInt()}°",
-            highlight = bearingToQibla < 5f || bearingToQibla > 355f
+            label     = strings.deviation,
+            value     = "${bearingToQibla.toInt()}°",
+            highlight = isAligned(bearingToQibla)
         )
     }
 }
@@ -350,42 +373,53 @@ private fun InfoCell(
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            text      = label,
-            style     = MaterialTheme.typography.labelSmall,
-            color     = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+            text  = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
         )
         Text(
-            text      = value,
-            style     = MaterialTheme.typography.titleMedium,
+            text       = value,
+            style      = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color     = if (highlight) Color(0xFF2E7D32)
-            else MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center
+            color      = if (highlight) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onBackground,
+            textAlign  = TextAlign.Center
         )
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Hata ekranı
+// Sensör yok mesajı
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun NoSensorMessage() {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Pusula illüstrasyonu (SVG yok, native Canvas ile çiziyoruz)
+        Canvas(modifier = Modifier.size(96.dp)) {
+            val cx = size.width / 2f
+            val cy = size.height / 2f
+            val r = minOf(cx, cy) * 0.9f
+            drawCircle(color = Color(0xFF2E7D32).copy(alpha = 0.15f), radius = r)
+            drawCircle(color = Color(0xFF2E7D32), radius = r, style = Stroke(width = 3.dp.toPx()))
+            // Kuzey iğnesi
+            drawLine(Color(0xFFD32F2F), Offset(cx, cy), Offset(cx, cy - r * 0.6f), strokeWidth = 6.dp.toPx(), cap = StrokeCap.Round)
+            // Güney iğnesi
+            drawLine(Color(0xFF9E9E9E), Offset(cx, cy), Offset(cx, cy + r * 0.6f), strokeWidth = 6.dp.toPx(), cap = StrokeCap.Round)
+            // Merkez nokta
+            drawCircle(color = Color(0xFF2E7D32), radius = 8.dp.toPx())
+        }
+        val strings = LocalStrings.current
         Text(
-            text      = "🧭",
-            fontSize  = 64.sp
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text      = "Pusula sensörü bulunamadı",
+            text      = strings.noSensor,
             style     = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text      = "Bu özellik manyetometre sensörü gerektirmektedir.",
+            text      = strings.magnetometerRequired,
             style     = MaterialTheme.typography.bodyMedium,
             color     = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
             textAlign = TextAlign.Center

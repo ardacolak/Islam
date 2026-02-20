@@ -29,7 +29,12 @@ class UserPreferencesDataStore @Inject constructor(
         val USE_GPS             = booleanPreferencesKey("use_gps")
         val DARK_THEME          = booleanPreferencesKey("dark_theme")
         val SCHOOL              = intPreferencesKey("school")       // 0=Şafii, 1=Hanefi
+        val LANGUAGE            = stringPreferencesKey("language")  // "tr" | "en" | "ar"
         val ONBOARDING_DONE     = booleanPreferencesKey("onboarding_done")
+        // Namaz takibi
+        val PRAYER_STREAK       = intPreferencesKey("prayer_streak")
+        val STREAK_LAST_DATE    = stringPreferencesKey("streak_last_date")
+        val COMPLETED_PRAYERS   = stringPreferencesKey("completed_prayers_today") // "date|prayer1,prayer2"
     }
 
     val userPreferences: Flow<UserPreferences> = context.dataStore.data
@@ -46,7 +51,8 @@ class UserPreferencesDataStore @Inject constructor(
                 notificationsEnabled = prefs[Keys.NOTIFICATIONS] ?: true,
                 useGps               = prefs[Keys.USE_GPS] ?: false,
                 darkTheme            = prefs[Keys.DARK_THEME] ?: false,
-                school               = prefs[Keys.SCHOOL] ?: 0
+                school               = prefs[Keys.SCHOOL] ?: 0,
+                language             = prefs[Keys.LANGUAGE] ?: "tr"
             )
         }
 
@@ -84,14 +90,60 @@ class UserPreferencesDataStore @Inject constructor(
         context.dataStore.edit { prefs -> prefs[Keys.SCHOOL] = school }
     }
 
+    suspend fun updateLanguage(language: String) {
+        context.dataStore.edit { prefs -> prefs[Keys.LANGUAGE] = language }
+    }
+
     // ── Onboarding ────────────────────────────────────────────────────────────
 
-    /** İlk açılış tamamlandı mı? false → onboarding göster. */
     val onboardingCompleted: Flow<Boolean> = context.dataStore.data
         .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
         .map { prefs -> prefs[Keys.ONBOARDING_DONE] ?: false }
 
     suspend fun setOnboardingCompleted() {
         context.dataStore.edit { prefs -> prefs[Keys.ONBOARDING_DONE] = true }
+    }
+
+    // ── Namaz Takibi ─────────────────────────────────────────────────────────
+
+    /** Bugün tamamlanan namaz id'leri (virgülle ayrılmış), format: "YYYY-MM-DD|id1,id2" */
+    val completedPrayersToday: Flow<Set<String>> = context.dataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { prefs ->
+            val today = java.time.LocalDate.now().toString()
+            val raw = prefs[Keys.COMPLETED_PRAYERS] ?: ""
+            if (raw.startsWith(today)) {
+                raw.substringAfter("|").split(",").filter { it.isNotBlank() }.toSet()
+            } else emptySet()
+        }
+
+    val prayerStreak: Flow<Int> = context.dataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { prefs -> prefs[Keys.PRAYER_STREAK] ?: 0 }
+
+    suspend fun togglePrayerCompleted(prayerId: String, allPrayerIds: List<String>) {
+        val today = java.time.LocalDate.now().toString()
+        context.dataStore.edit { prefs ->
+            val raw = prefs[Keys.COMPLETED_PRAYERS] ?: ""
+            val currentSet = if (raw.startsWith(today)) {
+                raw.substringAfter("|").split(",").filter { it.isNotBlank() }.toMutableSet()
+            } else mutableSetOf()
+
+            if (prayerId in currentSet) currentSet.remove(prayerId)
+            else currentSet.add(prayerId)
+
+            prefs[Keys.COMPLETED_PRAYERS] = "$today|${currentSet.joinToString(",")}"
+
+            // Eğer tüm namazlar tamamlandıysa streak artır
+            if (currentSet.containsAll(allPrayerIds)) {
+                val lastDate = prefs[Keys.STREAK_LAST_DATE] ?: ""
+                val yesterday = java.time.LocalDate.now().minusDays(1).toString()
+                val currentStreak = prefs[Keys.PRAYER_STREAK] ?: 0
+                if (lastDate != today) {
+                    prefs[Keys.PRAYER_STREAK] = if (lastDate == yesterday) currentStreak + 1 else 1
+                    prefs[Keys.STREAK_LAST_DATE] = today
+                }
+            }
+        }
     }
 }
