@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.Calendar
 import javax.inject.Inject
 
 data class HomeUiState(
@@ -41,7 +42,9 @@ data class HomeUiState(
     /** true olduğunda namaz vakitleri yüklenir; false iken izin ekranı gösterilir */
     val permissionsGranted: Boolean = false,
     /** Ardışık tamamlanmış namaz gün sayısı */
-    val prayerStreak: Int = 0
+    val prayerStreak: Int = 0,
+    /** Ramazan başlangıcına kalan gün; null = zaten Ramazan'dayız veya hesap dışı */
+    val daysToRamadan: Int? = null
 )
 
 @HiltViewModel
@@ -60,7 +63,8 @@ class HomeViewModel @Inject constructor(
             // İzinler zaten verilmişse doğrudan başlat — ekranda yanıp sönme olmaz
             permissionsGranted = appContext.areAllPermissionsGranted(),
             // Günlük ayet/hadis init'te hemen yüklenir (senkron, IO yok)
-            dailyQuote = getDailyQuoteUseCase()
+            dailyQuote = getDailyQuoteUseCase(),
+            daysToRamadan = calculateDaysToRamadan()
         )
     )
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -160,6 +164,33 @@ class HomeViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch { loadPrayerTimes(_uiState.value.userPreferences) }
+    }
+
+    /**
+     * Ramazan'ın başlangıcına kalan gün sayısını hesaplar.
+     * Yaklaşık Ramazan başlangıç tarihleri (Umm al-Qura takvimi).
+     * null döndürüyorsa zaten Ramazan'dayız veya bir sonraki bilinen tarih yok.
+     */
+    private fun calculateDaysToRamadan(): Int? {
+        // (yıl, ay, gün) — Miladi, 1-indexed ay
+        val ramadanStarts = listOf(
+            Triple(2026, 2, 28),  // Ramazan 1447
+            Triple(2027, 2, 17),  // Ramazan 1448 (yaklaşık)
+            Triple(2028, 2,  6),  // Ramazan 1449 (yaklaşık)
+            Triple(2029, 1, 26),  // Ramazan 1450 (yaklaşık)
+        )
+        val today = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }
+        for ((y, m, d) in ramadanStarts) {
+            val ramadan = Calendar.getInstance().apply {
+                set(y, m - 1, d, 0, 0, 0); set(Calendar.MILLISECOND, 0)
+            }
+            val diffDays = ((ramadan.timeInMillis - today.timeInMillis) / 86_400_000L).toInt()
+            if (diffDays >= 0) return diffDays
+        }
+        return null
     }
 
     // ─────────────────────────────────────────────────────────────────────────

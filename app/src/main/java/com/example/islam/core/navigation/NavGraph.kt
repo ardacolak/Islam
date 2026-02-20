@@ -40,7 +40,7 @@ fun NavGraph(
             OnboardingScreen(navController = navController)
         }
         composable(Screen.Home.route) {
-            HomeScreen()
+            HomeScreen(navController = navController)
         }
         composable(Screen.PrayerTimes.route) {
             PrayerScreen()

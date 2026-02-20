@@ -12,7 +12,6 @@ import com.example.islam.R
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Google Fonts sağlayıcısı
-// res/font/font_certs.xml üzerinden doğrulanır.
 // ─────────────────────────────────────────────────────────────────────────────
 private val googleFontProvider = GoogleFont.Provider(
     providerAuthority = "com.google.android.gms.fonts",
@@ -21,7 +20,6 @@ private val googleFontProvider = GoogleFont.Provider(
 )
 
 // ── Nunito — Başlık ve UI Fontu ───────────────────────────────────────────────
-// Yuvarlak, modern, okunabilir. İslami içerik için huzurlu hissiyet.
 private val nunitoFont = GoogleFont("Nunito")
 
 private val NunitoFamily = FontFamily(
@@ -34,7 +32,6 @@ private val NunitoFamily = FontFamily(
 )
 
 // ── Lato — Okuma / Gövde Fontu ───────────────────────────────────────────────
-// Açık, tarafsız, uzun metinlerde göz yormaz.
 private val latoFont = GoogleFont("Lato")
 
 private val LatoFamily = FontFamily(
@@ -47,11 +44,8 @@ private val LatoFamily = FontFamily(
 // ─────────────────────────────────────────────────────────────────────────────
 // Material 3 Tipografi Ölçeği
 //
-// Display  → Karşılama ekranları, hero başlıkları
-// Headline → Ekran başlıkları, kart başlıkları
-// Title    → Bölüm başlıkları, liste öğesi başlıkları
-// Body     → Paragraf & açıklama metni, namaz vakiti açıklamaları
-// Label    → Düğme, sekme, etiket
+// ADM-inspired: daha kompakt letter-spacing, daha sıkı line-height,
+// body boyutları ADM font-size tokenleri ile uyumlu (13-14sp ana body)
 // ─────────────────────────────────────────────────────────────────────────────
 val IslamicTypography = Typography(
 
@@ -114,37 +108,37 @@ val IslamicTypography = Typography(
         fontWeight    = FontWeight.SemiBold,
         fontSize      = 16.sp,
         lineHeight    = 24.sp,
-        letterSpacing = 0.15.sp
+        letterSpacing = 0.sp          // ADM: daha sıkı, 0.15→0
     ),
     titleSmall = TextStyle(
         fontFamily    = NunitoFamily,
         fontWeight    = FontWeight.SemiBold,
         fontSize      = 14.sp,
         lineHeight    = 20.sp,
-        letterSpacing = 0.1.sp
+        letterSpacing = 0.sp          // ADM: daha sıkı, 0.1→0
     ),
 
-    // ── Body — Namaz vakitleri, hadisler, açıklama metinleri ──────────────────
+    // ── Body — ADM font-size-5/6 (13-14sp) ───────────────────────────────────
     bodyLarge = TextStyle(
         fontFamily    = LatoFamily,
         fontWeight    = FontWeight.Normal,
         fontSize      = 16.sp,
-        lineHeight    = 26.sp,   // okuma konforu için geniş satır aralığı
-        letterSpacing = 0.5.sp
+        lineHeight    = 24.sp,        // ADM: sıkı satır yüksekliği (26→24)
+        letterSpacing = 0.sp          // ADM: 0.5→0, kompakt
     ),
     bodyMedium = TextStyle(
         fontFamily    = LatoFamily,
         fontWeight    = FontWeight.Normal,
-        fontSize      = 14.sp,
-        lineHeight    = 22.sp,
-        letterSpacing = 0.25.sp
+        fontSize      = 14.sp,        // ADM font-size-6: 14px
+        lineHeight    = 20.sp,        // ADM: sıkı (22→20)
+        letterSpacing = 0.sp          // ADM: kompakt
     ),
     bodySmall = TextStyle(
         fontFamily    = LatoFamily,
         fontWeight    = FontWeight.Normal,
-        fontSize      = 12.sp,
+        fontSize      = 13.sp,        // ADM font-size-5: 13px (--adm-font-size-main)
         lineHeight    = 18.sp,
-        letterSpacing = 0.4.sp
+        letterSpacing = 0.sp          // ADM: kompakt (0.4→0)
     ),
 
     // ── Label — Butonlar, sekmeler, etiketler ─────────────────────────────────
@@ -153,20 +147,20 @@ val IslamicTypography = Typography(
         fontWeight    = FontWeight.SemiBold,
         fontSize      = 14.sp,
         lineHeight    = 20.sp,
-        letterSpacing = 0.1.sp
+        letterSpacing = 0.sp          // ADM: 0.1→0
     ),
     labelMedium = TextStyle(
         fontFamily    = NunitoFamily,
         fontWeight    = FontWeight.Medium,
         fontSize      = 12.sp,
         lineHeight    = 16.sp,
-        letterSpacing = 0.5.sp
+        letterSpacing = 0.sp          // ADM: 0.5→0
     ),
     labelSmall = TextStyle(
         fontFamily    = NunitoFamily,
         fontWeight    = FontWeight.Medium,
         fontSize      = 11.sp,
         lineHeight    = 16.sp,
-        letterSpacing = 0.5.sp
+        letterSpacing = 0.sp          // ADM: 0.5→0
     )
 )

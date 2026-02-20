@@ -2,6 +2,7 @@ package com.example.islam.presentation.settings
 
 import android.os.Build
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -87,7 +89,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             Spacer(Modifier.height(12.dp))
             Button(
                 onClick  = viewModel::saveLocation,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape    = RoundedCornerShape(8.dp)    // ADM button radius
             ) {
                 Text(strings.save)
             }
@@ -327,26 +330,40 @@ private fun BatteryOptimizationCard(
     }
 }
 
-// ─── Genel ayar kartı ────────────────────────────────────────────────────────
+// ─── Genel ayar kartı (ADM-style: 8dp radius, thin border, F5F5F5 bg) ──────────────────────
 
 @Composable
 private fun SettingsCard(
     title: String,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape    = RoundedCornerShape(12.dp),
-        colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(8.dp)
+            )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        // ADM section header
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+        ) {
             Text(
                 text       = title,
-                style      = MaterialTheme.typography.titleSmall,
+                style      = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 color      = MaterialTheme.colorScheme.primary
             )
-            Spacer(Modifier.height(12.dp))
+        }
+        // ADM divider between header and content
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
             content()
         }
     }

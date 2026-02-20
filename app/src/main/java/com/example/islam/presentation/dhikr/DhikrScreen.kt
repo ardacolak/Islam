@@ -18,6 +18,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -34,6 +35,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -120,22 +122,38 @@ fun DhikrScreen(viewModel: DhikrViewModel = hiltViewModel()) {
         Spacer(Modifier.height(16.dp))
 
         state.selectedDhikr?.let { dhikr ->
-            // Arapça metin
-            Text(
-                text = dhikr.arabicText,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center,
-                lineHeight = 40.sp
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = dhikr.meaning,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                textAlign = TextAlign.Center
-            )
+            // ADM-style: subtle card container for Arabic text
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = dhikr.arabicText,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 40.sp
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = dhikr.meaning,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
 
             Spacer(Modifier.height(8.dp))
 
@@ -423,16 +441,23 @@ private fun DrawScope.drawTasbeehDots(
 private fun DhikrChip(dhikr: Dhikr, isSelected: Boolean, onClick: () -> Unit) {
     val containerColor by animateColorAsState(
         targetValue = if (isSelected) MaterialTheme.colorScheme.primary
-                      else MaterialTheme.colorScheme.surfaceVariant,
+                      else MaterialTheme.colorScheme.surface,
         animationSpec = tween(250),
         label = "chip_color"
     )
 
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = containerColor,
-        modifier = Modifier.clickable(onClick = onClick),
-        tonalElevation = if (isSelected) 0.dp else 1.dp
+    // ADM-style: 6dp radius, border on unselected
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(containerColor)
+            .border(
+                width = 1.dp,
+                color = if (isSelected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(6.dp)
+            )
+            .clickable(onClick = onClick)
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
@@ -441,15 +466,15 @@ private fun DhikrChip(dhikr: Dhikr, isSelected: Boolean, onClick: () -> Unit) {
             Text(
                 text = dhikr.name,
                 style = MaterialTheme.typography.labelLarge,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 color = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                        else MaterialTheme.colorScheme.onSurfaceVariant
+                        else MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = "${dhikr.targetCount}×",
                 style = MaterialTheme.typography.labelSmall,
                 color = if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
-                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )
         }
     }

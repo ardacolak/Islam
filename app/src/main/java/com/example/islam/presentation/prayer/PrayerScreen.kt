@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -146,11 +147,11 @@ private fun CompletionProgress(completed: Int, total: Int) {
             progress = { animatedProgress },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp)),
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp)),
             color = if (completed == total) Color(0xFF2E7D32)
                     else MaterialTheme.colorScheme.primary,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant
+            trackColor = MaterialTheme.colorScheme.outlineVariant
         )
     }
 }
@@ -205,11 +206,24 @@ private fun PrayerRow(
         label = "prayer_row_color"
     )
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isCurrent) 4.dp else 1.dp)
+    // ADM-style: 8dp radius, thin border on non-active, no shadow
+    val borderColor = when {
+        isCompleted -> Color(0xFF2E7D32).copy(alpha = 0.3f)
+        isCurrent   -> MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+        else        -> MaterialTheme.colorScheme.outlineVariant
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(8.dp)
+            ),
+        shape  = RoundedCornerShape(8.dp),
+        color  = containerColor,
+        tonalElevation = if (isCurrent) 2.dp else 0.dp
     ) {
         Row(
             modifier = Modifier

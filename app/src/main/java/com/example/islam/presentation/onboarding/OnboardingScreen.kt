@@ -187,7 +187,7 @@ fun OnboardingScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
-                        shape  = RoundedCornerShape(16.dp),
+                        shape  = RoundedCornerShape(8.dp),   // ADM button radius
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
                         )
@@ -228,7 +228,7 @@ fun OnboardingScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
-                        shape  = RoundedCornerShape(16.dp),
+                        shape  = RoundedCornerShape(8.dp),   // ADM button radius
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
                         )
@@ -271,7 +271,7 @@ private fun PageContent(page: OnboardingPage) {
             enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 3 }
         ) {
             Surface(
-                shape  = CircleShape,
+                shape  = RoundedCornerShape(20.dp),   // ADM avatar/icon container style
                 color  = MaterialTheme.colorScheme.primaryContainer,
                 modifier = Modifier.size(112.dp)
             ) {
@@ -333,13 +333,13 @@ private fun PageIndicator(pageCount: Int, currentPage: Int) {
         repeat(pageCount) { idx ->
             val isSelected = idx == currentPage
             val width by animateDpAsState(
-                targetValue = if (isSelected) 28.dp else 8.dp,
+                targetValue = if (isSelected) 24.dp else 8.dp,   // ADM: slimmer indicator
                 animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
                 label = "indicator_width"
             )
             Box(
                 modifier = Modifier
-                    .height(8.dp)
+                    .height(6.dp)           // ADM: 8dp→6dp
                     .width(width)
                     .clip(CircleShape)
                     .background(

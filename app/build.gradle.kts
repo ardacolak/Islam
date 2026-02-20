@@ -94,6 +94,9 @@ dependencies {
     // Play Services Location
     implementation(libs.play.services.location)
 
+    // Lottie — Compose animasyon desteği
+    implementation("com.airbnb.android:lottie-compose:6.6.4")
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
