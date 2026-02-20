@@ -104,6 +104,10 @@ class UserPreferencesDataStore @Inject constructor(
         context.dataStore.edit { prefs -> prefs[Keys.ONBOARDING_DONE] = true }
     }
 
+    suspend fun resetOnboarding() {
+        context.dataStore.edit { prefs -> prefs[Keys.ONBOARDING_DONE] = false }
+    }
+
     // ── Namaz Takibi ─────────────────────────────────────────────────────────
 
     /** Bugün tamamlanan namaz id'leri (virgülle ayrılmış), format: "YYYY-MM-DD|id1,id2" */

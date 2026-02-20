@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.islam.data.datastore.UserPreferencesDataStore
 import com.example.islam.services.CompassData
 import com.example.islam.services.CompassTracker
+import com.example.islam.utils.QiblaCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +19,9 @@ import javax.inject.Inject
 data class QiblaUiState(
     val compass: CompassData? = null,
     val hasSensor: Boolean = true,
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val locationName: String = "",
+    val distanceKm: Int = 0
 )
 
 @HiltViewModel
@@ -41,6 +44,12 @@ class QiblaViewModel @Inject constructor(
     private fun observeAndTrack() {
         viewModelScope.launch {
             prefsDataStore.userPreferences.collectLatest { prefs ->
+                _uiState.update { state ->
+                    state.copy(
+                        locationName = "${prefs.city}, ${prefs.country}",
+                        distanceKm = QiblaCalculator.distanceToKaabaKm(prefs.latitude, prefs.longitude)
+                    )
+                }
                 compassTracker
                     .track(prefs.latitude, prefs.longitude)
                     .catch { _uiState.update { it.copy(hasSensor = false, isLoading = false) } }

@@ -7,8 +7,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -28,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -52,14 +55,15 @@ import javax.inject.Inject
 data class BottomNavItem(
     val screen: Screen,
     val labelFn: (AppStrings) -> String,
-    val icon: ImageVector
+    val icon: ImageVector? = null,
+    val iconResId: Int? = null
 )
 
 private val bottomNavItems = listOf(
     BottomNavItem(Screen.Home,        { it.navHome },        Icons.Default.Home),
     BottomNavItem(Screen.PrayerTimes, { it.navPrayerTimes }, Icons.Outlined.AccessTime),
     BottomNavItem(Screen.Dhikr,       { it.navDhikr },       Icons.Outlined.Favorite),
-    BottomNavItem(Screen.Qibla,       { it.navQibla },       Icons.Outlined.Explore),
+    BottomNavItem(Screen.Qibla,       { it.navQibla },       iconResId = R.drawable.kible),
     BottomNavItem(Screen.Settings,    { it.navSettings },    Icons.Default.Settings)
 )
 
@@ -103,6 +107,7 @@ fun IslamApp(prefsDataStore: UserPreferencesDataStore) {
             val currentRoute   = backStackEntry?.destination?.route
 
             val showBottomBar = currentRoute != Screen.Onboarding.route
+                             && currentRoute != Screen.Home.route
 
             Scaffold(
                 bottomBar = {
@@ -111,7 +116,13 @@ fun IslamApp(prefsDataStore: UserPreferencesDataStore) {
                     }
                 }
             ) { innerPadding ->
-                Box(modifier = Modifier.padding(innerPadding)) {
+                // Home ekranı kendi layout'unu tam ekran yönetiyor
+                val padding = if (currentRoute == Screen.Home.route) {
+                    androidx.compose.foundation.layout.PaddingValues(0.dp)
+                } else {
+                    innerPadding
+                }
+                Box(modifier = Modifier.padding(padding)) {
                     NavGraph(
                         navController  = navController,
                         prefsDataStore = prefsDataStore
@@ -143,7 +154,15 @@ private fun IslamBottomNavBar(navController: NavController, strings: AppStrings)
             NavigationBarItem(
                 icon = {
                     Box {
-                        Icon(item.icon, contentDescription = label)
+                        if (item.iconResId != null) {
+                            Image(
+                                painter = painterResource(item.iconResId),
+                                contentDescription = label,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        } else {
+                            Icon(item.icon!!, contentDescription = label)
+                        }
                     }
                 },
                 label = { Text(label) },

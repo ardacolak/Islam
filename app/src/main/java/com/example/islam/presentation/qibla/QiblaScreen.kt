@@ -1,606 +1,532 @@
 package com.example.islam.presentation.qibla
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.*
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.filled.NearMe
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.res.painterResource
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.airbnb.lottie.compose.*
-import com.example.islam.core.i18n.LocalStrings
+import androidx.navigation.NavController
+import com.example.islam.R
+import com.example.islam.core.navigation.Screen
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.PI
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Renk sabitleri
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Colors ───────────────────────────────────────────────────────────────────
+private val Primary         = Color(0xFF87A96A)
+private val EmeraldDeep     = Color(0xFF2D5A27)
+private val BackgroundLight = Color(0xFFF9F9F7)
+private val NeumorphicShadow    = Color(0xFFD1D1CF)
+private val NeumorphicHighlight = Color(0xFFFFFFFF)
+private val SlateLight      = Color(0xFFCBD5E1)   // slate-300
+private val SlateText       = Color(0xFF475569)   // slate-500
+private val SlateDark       = Color(0xFF1E293B)   // slate-800
+private val LocationBg      = Color(0xFFE8EFE3)
 
-private val QiblaGreen      = Color(0xFF1B5E20)
-private val QiblaGreenLight = Color(0xFF2E7D32)
-private val QiblaGreenMid   = Color(0xFF43A047)
-private val NeedleRed       = Color(0xFFD32F2F)
+// ─── Neumorphic helpers ────────────────────────────────────────────────────────
+private fun Modifier.neumorphicShadow(
+    cornerRadius: Dp = 16.dp,
+    shadowColor: Color = NeumorphicShadow,
+    highlightColor: Color = NeumorphicHighlight,
+    offset: Dp = 8.dp,
+    blurRadius: Dp = 16.dp,
+): Modifier = this.drawBehind {
+    val r = cornerRadius.toPx()
+    val o = offset.toPx()
+    // dark shadow (bottom-right)
+    drawRoundRect(
+        color = shadowColor,
+        topLeft = Offset(o, o),
+        size = size,
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(r),
+        alpha = 0.8f
+    )
+    // highlight (top-left)
+    drawRoundRect(
+        color = highlightColor,
+        topLeft = Offset(-o, -o),
+        size = size,
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(r),
+        alpha = 0.9f
+    )
+}
 
-private fun isAligned(bearingToQibla: Float) =
-    bearingToQibla < 5f || bearingToQibla > 355f
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Ana ekran
-// ─────────────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun QiblaScreen(viewModel: QiblaViewModel = hiltViewModel()) {
+fun QiblaScreen(
+    navController: NavController,
+    viewModel: QiblaViewModel = hiltViewModel()
+) {
     val uiState by viewModel.uiState.collectAsState()
-    val haptic  = LocalHapticFeedback.current
-    val strings = LocalStrings.current
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text       = strings.qiblaDirection,
-                        style      = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color      = MaterialTheme.colorScheme.primary
-                    )
-                },
-                navigationIcon = {
-                    Icon(
-                        imageVector        = Icons.Outlined.Explore,
-                        contentDescription = null,
-                        tint               = MaterialTheme.colorScheme.primary,
-                        modifier           = Modifier
-                            .padding(start = 16.dp)
-                            .size(24.dp)
-                    )
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 24.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Arapça alt başlık
-            Text(
-                text  = "القبلة",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.8f)
-            )
+    val qiblaDegrees = uiState.compass?.qiblaAngle ?: 0f
+    val locationName = uiState.locationName.ifEmpty { "—" }
+    val distanceKm = uiState.distanceKm
 
-            Spacer(Modifier.height(20.dp))
-
-            when {
-                !uiState.hasSensor -> {
-                    Spacer(Modifier.weight(1f))
-                    NoSensorMessage()
-                    Spacer(Modifier.weight(1f))
-                }
-                uiState.isLoading -> {
-                    Spacer(Modifier.weight(1f))
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.weight(1f))
-                }
-                else -> {
-                    val compass = uiState.compass!!
-
-                    val animatedAzimuth by animateFloatAsState(
-                        targetValue   = compass.azimuth,
-                        animationSpec = spring(stiffness = Spring.StiffnessLow),
-                        label         = "azimuth"
-                    )
-                    val animatedBearing by animateFloatAsState(
-                        targetValue   = compass.bearingToQibla,
-                        animationSpec = spring(stiffness = Spring.StiffnessLow),
-                        label         = "bearing"
-                    )
-
-                    val aligned = isAligned(compass.bearingToQibla)
-
-                    var wasAligned by remember { mutableStateOf(false) }
-                    LaunchedEffect(aligned) {
-                        if (aligned && !wasAligned)
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        wasAligned = aligned
-                    }
-
-                    // Pulse animasyonu (hizalandığında yeşil parıltı)
-                    val infiniteTransition = rememberInfiniteTransition(label = "glow")
-                    val glowAlpha by infiniteTransition.animateFloat(
-                        initialValue  = 0.1f,
-                        targetValue   = if (aligned) 0.4f else 0.1f,
-                        animationSpec = infiniteRepeatable(
-                            animation  = tween(900, easing = FastOutSlowInEasing),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "glow_alpha"
-                    )
-
-                    // Lottie state — Box dışında tanımlanmalı
-                    val lottieComp by rememberLottieComposition(
-                        LottieCompositionSpec.Asset("qibla_aligned.json")
-                    )
-                    val lottieProgress by animateLottieCompositionAsState(
-                        composition   = lottieComp,
-                        isPlaying     = aligned,
-                        restartOnPlay = true,
-                        iterations    = LottieConstants.IterateForever
-                    )
-
-                    // ── Pusula kutusu ────────────────────────────────────────
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier         = Modifier
-                            .fillMaxWidth(0.88f)
-                            .aspectRatio(1f)
-                    ) {
-                        // Gölgeli arka plan daire
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .shadow(
-                                    elevation     = if (aligned) 16.dp else 8.dp,
-                                    shape         = CircleShape,
-                                    ambientColor  = if (aligned) QiblaGreenLight.copy(alpha = 0.3f)
-                                                    else Color.Gray.copy(alpha = 0.2f),
-                                    spotColor     = if (aligned) QiblaGreen.copy(alpha = 0.2f)
-                                                    else Color.Gray.copy(alpha = 0.15f)
-                                )
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surface)
-                        )
-
-                        // Pusula çizimi
-                        CompassCanvas(
-                            azimuth        = animatedAzimuth,
-                            bearingToQibla = animatedBearing,
-                            aligned        = aligned,
-                            glowAlpha      = if (aligned) glowAlpha else 0f,
-                            modifier       = Modifier.fillMaxSize()
-                        )
-
-                        // Lottie kutlama animasyonu (hizalandığında)
-                        if (aligned) {
-                            LottieAnimation(
-                                composition = lottieComp,
-                                progress    = { lottieProgress },
-                                modifier    = Modifier.fillMaxSize()
-                            )
-                        }
-                    }
-
-                    Spacer(Modifier.height(28.dp))
-
-                    // ── Bilgi kartları ───────────────────────────────────────
-                    InfoCardsRow(
-                        azimuth        = compass.azimuth,
-                        qiblaAngle     = compass.qiblaAngle,
-                        bearingToQibla = compass.bearingToQibla
-                    )
-
-                    // ── Hizalama mesajı ──────────────────────────────────────
-                    AnimatedVisibility(
-                        visible = aligned,
-                        enter   = fadeIn(tween(400)) + scaleIn(initialScale = 0.9f),
-                        exit    = fadeOut(tween(300))
-                    ) {
-                        Column(
-                            modifier            = Modifier.padding(top = 20.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(text = "🕋", fontSize = 32.sp)
-                            Text(
-                                text       = strings.qiblaAligned,
-                                style      = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold,
-                                color      = QiblaGreenLight,
-                                textAlign  = TextAlign.Center
-                            )
-                        }
-                    }
-                }
+    when {
+        uiState.isLoading -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(BackgroundLight),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Primary)
             }
         }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Pusula Canvas — gelişmiş görsel
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun CompassCanvas(
-    azimuth        : Float,
-    bearingToQibla : Float,
-    aligned        : Boolean,
-    glowAlpha      : Float,
-    modifier       : Modifier = Modifier
-) {
-    val bgColor         = MaterialTheme.colorScheme.surface
-    val ringColor       = if (aligned) QiblaGreenLight else MaterialTheme.colorScheme.outline
-    val tickMajorColor  = MaterialTheme.colorScheme.onSurface
-    val tickMinorColor  = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
-    val centerFillColor = MaterialTheme.colorScheme.surfaceVariant
-    val labelColor      = MaterialTheme.colorScheme.onSurface
-
-    Canvas(modifier = modifier) {
-        val cx     = size.width / 2f
-        val cy     = size.height / 2f
-        val outerR = minOf(cx, cy) * 0.90f
-        val innerR = outerR * 0.80f
-
-        // ── Arka plan ──────────────────────────────────────────────────
-        drawCircle(
-            brush  = Brush.radialGradient(
-                colors = listOf(bgColor, bgColor.copy(alpha = 0.95f)),
-                center = Offset(cx, cy),
-                radius = outerR
-            ),
-            radius = outerR,
-            center = Offset(cx, cy)
-        )
-
-        // ── Dönen pusula katmanı ───────────────────────────────────────
-        rotate(-azimuth, pivot = Offset(cx, cy)) {
-
-            // Dış halka
-            drawCircle(
-                color  = ringColor,
-                radius = outerR,
-                center = Offset(cx, cy),
-                style  = Stroke(width = 2.5.dp.toPx())
-            )
-
-            // İç dekoratif halka
-            drawCircle(
-                color  = ringColor.copy(alpha = 0.3f),
-                radius = innerR,
-                center = Offset(cx, cy),
-                style  = Stroke(width = 0.8.dp.toPx())
-            )
-
-            // Kadran tıkları
-            for (deg in 0 until 360 step 5) {
-                val isMajor  = deg % 30 == 0
-                val isMinor5 = deg % 15 == 0
-                val rad      = Math.toRadians(deg.toDouble())
-                val len      = when {
-                    isMajor  -> 18.dp.toPx()
-                    isMinor5 -> 10.dp.toPx()
-                    else     -> 5.dp.toPx()
-                }
-                val startR = outerR - len
-                drawLine(
-                    color       = when {
-                        isMajor && deg == 0 -> NeedleRed
-                        isMajor             -> tickMajorColor
-                        isMinor5            -> tickMajorColor.copy(alpha = 0.5f)
-                        else                -> tickMinorColor
-                    },
-                    start       = Offset(cx + startR * sin(rad).toFloat(), cy - startR * cos(rad).toFloat()),
-                    end         = Offset(cx + outerR * sin(rad).toFloat(), cy - outerR * cos(rad).toFloat()),
-                    strokeWidth = when {
-                        isMajor  -> 2.8.dp.toPx()
-                        isMinor5 -> 1.5.dp.toPx()
-                        else     -> 0.8.dp.toPx()
-                    }
+        !uiState.hasSensor -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(BackgroundLight),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Pusula sensörü kullanılamıyor.",
+                    color = SlateText,
+                    style = MaterialTheme.typography.bodyLarge
                 )
             }
-
-            // Kadran etiketleri
-            val lblR = outerR - 34.dp.toPx()
-            drawCardinalLabel(this, "K", 0f,   cx, cy, lblR, NeedleRed,   42f)
-            drawCardinalLabel(this, "D", 90f,  cx, cy, lblR, labelColor,  34f)
-            drawCardinalLabel(this, "G", 180f, cx, cy, lblR, labelColor,  34f)
-            drawCardinalLabel(this, "B", 270f, cx, cy, lblR, labelColor,  34f)
-
-            // Pusula iğnesi
-            drawCompassNeedle(
-                cx           = cx, cy = cy,
-                northColor   = NeedleRed,
-                southColor   = tickMajorColor.copy(alpha = 0.35f),
-                needleLength = outerR * 0.48f,
-                needleWidth  = 9.dp.toPx()
+        }
+        else -> {
+            QiblaFinderContent(
+                navController = navController,
+                qiblaDegrees = qiblaDegrees,
+                locationName = locationName,
+                distanceKm = distanceKm
             )
         }
-
-        // ── Merkez daire ───────────────────────────────────────────────
-        drawCircle(
-            brush  = Brush.radialGradient(
-                colors = listOf(centerFillColor, centerFillColor.copy(alpha = 0.8f)),
-                center = Offset(cx, cy),
-                radius = 22.dp.toPx()
-            ),
-            radius = 22.dp.toPx(),
-            center = Offset(cx, cy)
-        )
-        drawCircle(
-            color  = ringColor.copy(alpha = 0.5f),
-            radius = 22.dp.toPx(),
-            center = Offset(cx, cy),
-            style  = Stroke(width = 1.5.dp.toPx())
-        )
-
-        // ── Kıble oku (sabit — dönmez) ─────────────────────────────────
-        val bearRad   = Math.toRadians(bearingToQibla.toDouble())
-        val arrowLen  = outerR * 0.58f
-        val arrowEndX = cx + arrowLen * sin(bearRad).toFloat()
-        val arrowEndY = cy - arrowLen * cos(bearRad).toFloat()
-
-        // Hizalanma glow halkası
-        if (glowAlpha > 0f) {
-            drawCircle(
-                brush  = Brush.radialGradient(
-                    colors = listOf(QiblaGreenLight.copy(alpha = glowAlpha), Color.Transparent),
-                    center = Offset(arrowEndX, arrowEndY),
-                    radius = 40.dp.toPx()
-                ),
-                radius = 40.dp.toPx(),
-                center = Offset(arrowEndX, arrowEndY)
-            )
-        }
-
-        // Ok gövdesi (gölge + ana çizgi)
-        drawLine(
-            color       = QiblaGreen.copy(alpha = 0.2f),
-            start       = Offset(cx + 2f, cy + 2f),
-            end         = Offset(arrowEndX + 2f, arrowEndY + 2f),
-            strokeWidth = 8.dp.toPx(),
-            cap         = StrokeCap.Round
-        )
-        drawLine(
-            brush       = Brush.linearGradient(
-                colors = listOf(QiblaGreenMid, QiblaGreen),
-                start  = Offset(cx, cy),
-                end    = Offset(arrowEndX, arrowEndY)
-            ),
-            start       = Offset(cx, cy),
-            end         = Offset(arrowEndX, arrowEndY),
-            strokeWidth = 6.dp.toPx(),
-            cap         = StrokeCap.Round
-        )
-
-        // Ok ucu (üçgen)
-        val tipSize  = 13.dp.toPx()
-        val perpRad  = bearRad + Math.PI / 2
-        val tipLeft  = Offset(arrowEndX - tipSize * sin(perpRad).toFloat(), arrowEndY + tipSize * cos(perpRad).toFloat())
-        val tipRight = Offset(arrowEndX + tipSize * sin(perpRad).toFloat(), arrowEndY - tipSize * cos(perpRad).toFloat())
-        val tipTop   = Offset(
-            arrowEndX + (tipSize * 1.8f) * sin(bearRad).toFloat(),
-            arrowEndY - (tipSize * 1.8f) * cos(bearRad).toFloat()
-        )
-        val arrowPath = Path().apply {
-            moveTo(tipTop.x, tipTop.y)
-            lineTo(tipLeft.x, tipLeft.y)
-            lineTo(tipRight.x, tipRight.y)
-            close()
-        }
-        drawPath(arrowPath, color = QiblaGreen)
-
-        // 🕋 Kabe emoji — ok ucunun biraz ötesinde
-        val kaabeDist = arrowLen + 28.dp.toPx()
-        val kaabeX    = cx + kaabeDist * sin(bearRad).toFloat()
-        val kaabeY    = cy - kaabeDist * cos(bearRad).toFloat()
-        drawContext.canvas.nativeCanvas.apply {
-            val emPaint = android.graphics.Paint().apply {
-                textSize  = 36f
-                isAntiAlias = true
-                textAlign = android.graphics.Paint.Align.CENTER
-            }
-            drawText("🕋", kaabeX, kaabeY + emPaint.textSize / 3f, emPaint)
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Yardımcı çizim fonksiyonları
-// ─────────────────────────────────────────────────────────────────────────────
-
-private fun DrawScope.drawCompassNeedle(
-    cx: Float, cy: Float,
-    northColor: Color, southColor: Color,
-    needleLength: Float, needleWidth: Float
-) {
-    val northPath = Path().apply {
-        moveTo(cx, cy - needleLength)
-        lineTo(cx - needleWidth / 2f, cy)
-        lineTo(cx + needleWidth / 2f, cy)
-        close()
-    }
-    val southPath = Path().apply {
-        moveTo(cx, cy + needleLength)
-        lineTo(cx - needleWidth / 2f, cy)
-        lineTo(cx + needleWidth / 2f, cy)
-        close()
-    }
-    drawPath(northPath, color = northColor)
-    drawPath(southPath, color = southColor)
-    drawCircle(color = southColor.copy(alpha = 0.6f), radius = 5.dp.toPx(), center = Offset(cx, cy))
-}
-
-private fun drawCardinalLabel(
-    scope    : DrawScope,
-    label    : String,
-    angleDeg : Float,
-    cx       : Float,
-    cy       : Float,
-    radius   : Float,
-    color    : Color,
-    textSize : Float = 36f
-) {
-    val rad = Math.toRadians(angleDeg.toDouble())
-    val x   = cx + radius * sin(rad).toFloat()
-    val y   = cy - radius * cos(rad).toFloat()
-    scope.drawContext.canvas.nativeCanvas.apply {
-        val paint = android.graphics.Paint().apply {
-            this.textSize  = textSize
-            textAlign      = android.graphics.Paint.Align.CENTER
-            isFakeBoldText = true
-            isAntiAlias    = true
-            typeface       = android.graphics.Typeface.DEFAULT_BOLD
-        }
-        paint.color = android.graphics.Color.argb(
-            (color.alpha * 255).toInt(),
-            (color.red   * 255).toInt(),
-            (color.green * 255).toInt(),
-            (color.blue  * 255).toInt()
-        )
-        drawText(label, x, y + paint.textSize / 3f, paint)
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Bilgi kartları
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun InfoCardsRow(
-    azimuth        : Float,
-    qiblaAngle     : Float,
-    bearingToQibla : Float
-) {
-    val strings = LocalStrings.current
-    Row(
-        modifier              = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        InfoCard(
-            modifier  = Modifier.weight(1f),
-            label     = strings.direction,
-            value     = "${azimuth.toInt()}°"
-        )
-        InfoCard(
-            modifier  = Modifier.weight(1f),
-            label     = strings.qibla,
-            value     = "${qiblaAngle.toInt()}°",
-            accent    = true
-        )
-        InfoCard(
-            modifier  = Modifier.weight(1f),
-            label     = strings.deviation,
-            value     = "${bearingToQibla.toInt()}°",
-            highlight = isAligned(bearingToQibla)
-        )
     }
 }
 
 @Composable
-private fun InfoCard(
-    modifier  : Modifier = Modifier,
-    label     : String,
-    value     : String,
-    highlight : Boolean = false,
-    accent    : Boolean = false
+private fun QiblaFinderContent(
+    navController: NavController?,
+    qiblaDegrees: Float,
+    locationName: String,
+    distanceKm: Int,
 ) {
-    val containerColor = when {
-        highlight -> QiblaGreenLight.copy(alpha = 0.12f)
-        accent    -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-        else      -> MaterialTheme.colorScheme.surface
-    }
-    val valueColor = when {
-        highlight -> QiblaGreenLight
-        accent    -> MaterialTheme.colorScheme.primary
-        else      -> MaterialTheme.colorScheme.onSurface
-    }
-
-    Card(
-        modifier  = modifier,
-        shape     = RoundedCornerShape(14.dp),
-        colors    = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (highlight) 4.dp else 1.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BackgroundLight)
     ) {
-        Column(
-            modifier            = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 14.dp, horizontal = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text  = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text       = value,
-                style      = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color      = valueColor,
-                textAlign  = TextAlign.Center
-            )
-        }
-    }
-}
+        IslamicPatternBackground()
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Sensör yok mesajı
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun NoSensorMessage() {
-    val strings = LocalStrings.current
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
         Box(
-            modifier         = Modifier
-                .size(120.dp)
-                .clip(CircleShape)
-                .background(QiblaGreenLight.copy(alpha = 0.1f)),
+            modifier = Modifier
+                .size(400.dp)
+                .align(Alignment.Center)
+                .offset(y = (-40).dp)
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Primary.copy(alpha = 0.10f), Color.Transparent)
+                    ),
+                    shape = CircleShape
+                )
+        )
+
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            QiblaHeader(navController = navController)
+
+            Spacer(Modifier.weight(1f))
+            CompassDial(arrowRotationDeg = qiblaDegrees)
+            Spacer(Modifier.height(32.dp))
+
+            DirectionInfo(
+                degrees = qiblaDegrees.toInt(),
+                locationName = locationName,
+                distanceKm = distanceKm
+            )
+            Spacer(Modifier.weight(1f))
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Header
+// ──────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun QiblaHeader(navController: NavController?) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(top = 48.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        NeumorphicIconButton(onClick = {
+            navController?.navigate(Screen.Home.route) {
+                popUpTo(Screen.Home.route) { inclusive = true }
+                launchSingleTop = true
+            }
+        }) { Icon(Icons.Outlined.GridView, contentDescription = "Ana sayfa", tint = SlateText) }
+
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "QIBLA FINDER",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = SlateText,
+                letterSpacing = 2.sp
+            )
+            Text(
+                text = "HIGH PRECISION",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = Primary,
+                letterSpacing = 1.5.sp
+            )
+        }
+
+        NeumorphicIconButton { Icon(Icons.Outlined.Settings, contentDescription = "Settings", tint = SlateText) }
+    }
+}
+
+@Composable
+private fun NeumorphicIconButton(onClick: () -> Unit = {}, content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .neumorphicShadow(cornerRadius = 16.dp, offset = 5.dp, blurRadius = 10.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(BackgroundLight)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) { content() }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Compass Dial
+// ──────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun CompassDial(arrowRotationDeg: Float) {
+    val dialSize = 280.dp
+
+    Box(
+        modifier = Modifier.size(dialSize),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawNeumorphicCircle(size.width / 2, size.height / 2, size.width / 2 - 2.dp.toPx())
+        }
+
+        Canvas(
+            modifier = Modifier
+                .size(dialSize - 24.dp)
+                .align(Alignment.Center)
+        ) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFFE8E8E6), BackgroundLight),
+                    radius = size.width / 2
+                )
+            )
+            drawCircle(
+                color = NeumorphicShadow.copy(alpha = 0.4f),
+                style = Stroke(width = 1.5.dp.toPx())
+            )
+        }
+
+        val innerSize = dialSize - 48.dp
+        Box(
+            modifier = Modifier.size(innerSize),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = "🧭", fontSize = 48.sp)
+            Text("N", modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
+                color = SlateText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text("E", modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp),
+                color = SlateText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text("S", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp),
+                color = SlateText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text("W", modifier = Modifier.align(Alignment.CenterStart).padding(start = 8.dp),
+                color = SlateText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        }
+
+        Box(
+            modifier = Modifier
+                .size(dialSize - 24.dp)
+                .rotate(arrowRotationDeg),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = 10.dp)
+                    .rotate(-arrowRotationDeg)
+                    .size(48.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.kible),
+                    contentDescription = "Kabe",
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            Canvas(
+                modifier = Modifier
+                    .width(16.dp)
+                    .height(110.dp)
+                    .align(Alignment.TopCenter)
+                    .offset(y = 44.dp)
+            ) {
+                val path = Path().apply {
+                    moveTo(size.width / 2f, 0f)
+                    lineTo(size.width, size.height * 0.85f)
+                    lineTo(size.width / 2f, size.height)
+                    lineTo(0f, size.height * 0.85f)
+                    close()
+                }
+                drawPath(
+                    path = path,
+                    brush = Brush.linearGradient(
+                        colors = listOf(Primary, EmeraldDeep),
+                        start = Offset(0f, 0f),
+                        end = Offset(size.width, size.height)
+                    )
+                )
+                val shimmerPath = Path().apply {
+                    moveTo(size.width / 2f, 0f)
+                    lineTo(size.width / 2f, size.height * 0.85f)
+                    lineTo(0f, size.height * 0.85f)
+                    close()
+                }
+                drawPath(
+                    path = shimmerPath,
+                    color = Color.White.copy(alpha = 0.25f)
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .neumorphicShadow(cornerRadius = 28.dp, offset = 4.dp, blurRadius = 8.dp)
+                .clip(CircleShape)
+                .background(BackgroundLight)
+                .zIndex(10f),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(SlateLight)
+            )
+        }
+    }
+}
+
+private fun DrawScope.drawNeumorphicCircle(cx: Float, cy: Float, radius: Float) {
+    drawCircle(
+        color = NeumorphicShadow,
+        radius = radius,
+        center = Offset(cx + 16.dp.toPx(), cy + 16.dp.toPx())
+    )
+    drawCircle(
+        color = NeumorphicHighlight,
+        radius = radius,
+        center = Offset(cx - 16.dp.toPx(), cy - 16.dp.toPx())
+    )
+    drawCircle(
+        brush = Brush.linearGradient(
+            colors = listOf(Color(0xFFFFFFFF), Color(0xFFE0E0DE)),
+            start = Offset(0f, 0f),
+            end = Offset(size.width, size.height)
+        ),
+        radius = radius,
+        center = Offset(cx, cy)
+    )
+    drawCircle(
+        color = Color.White.copy(alpha = 0.5f),
+        radius = radius,
+        style = Stroke(width = 1.dp.toPx())
+    )
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Direction Info + Location Card
+// ──────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun DirectionInfo(degrees: Int, locationName: String, distanceKm: Int) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(horizontal = 24.dp)
+    ) {
+        Row(verticalAlignment = Alignment.Top) {
+            Text(
+                text = "$degrees",
+                fontSize = 72.sp,
+                fontWeight = FontWeight.Bold,
+                color = SlateDark,
+                letterSpacing = (-2).sp,
+                lineHeight = 72.sp
+            )
+            Text(
+                text = "°",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = Primary,
+                modifier = Modifier.padding(top = 12.dp)
+            )
         }
         Text(
-            text       = strings.noSensor,
-            style      = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            textAlign  = TextAlign.Center
+            text = "QIBLA DIRECTION",
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            color = SlateText,
+            letterSpacing = 2.sp
         )
-        Text(
-            text      = strings.magnetometerRequired,
-            style     = MaterialTheme.typography.bodyMedium,
-            color     = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-            textAlign = TextAlign.Center
+
+        Spacer(Modifier.height(24.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .neumorphicShadow(cornerRadius = 24.dp, offset = 6.dp, blurRadius = 12.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(BackgroundLight)
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(LocationBg),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.NearMe,
+                    contentDescription = null,
+                    tint = Primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "CURRENT LOCATION",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF94A3B8),
+                    letterSpacing = 1.5.sp
+                )
+                Text(
+                    text = locationName,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = SlateDark
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .height(32.dp)
+                    .width(1.dp)
+                    .background(Color(0xFFE2E8F0))
+            )
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "DIST.",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF94A3B8),
+                    letterSpacing = 1.5.sp
+                )
+                Text(
+                    text = "$distanceKm km",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Primary
+                )
+            }
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Islamic Pattern Background
+// ──────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun IslamicPatternBackground() {
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val starColor = Color(0xFF87A96A).copy(alpha = 0.03f)
+        val step = 60.dp.toPx()
+        val cols = (size.width / step).toInt() + 2
+        val rows = (size.height / step).toInt() + 2
+
+        for (row in 0..rows) {
+            for (col in 0..cols) {
+                val cx = col * step
+                val cy = row * step
+                drawStar5(cx, cy, step * 0.35f, starColor)
+            }
+        }
+    }
+}
+
+private fun DrawScope.drawStar5(cx: Float, cy: Float, r: Float, color: Color) {
+    val path = Path()
+    val innerR = r * 0.4f
+    for (i in 0 until 10) {
+        val angle = (i * 36.0 * PI / 180.0) - PI / 2
+        val radius = if (i % 2 == 0) r else innerR
+        val x = cx + (radius * cos(angle)).toFloat()
+        val y = cy + (radius * sin(angle)).toFloat()
+        if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+    }
+    path.close()
+    drawPath(path, color)
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Preview
+// ──────────────────────────────────────────────────────────────────────────────
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+fun QiblaFinderPreview() {
+    MaterialTheme {
+        QiblaFinderContent(
+            navController = null,
+            qiblaDegrees = 147f,
+            locationName = "Makkah, SA",
+            distanceKm = 0
         )
     }
 }

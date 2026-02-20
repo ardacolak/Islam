@@ -15,6 +15,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -40,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.example.islam.R
 import com.example.islam.core.i18n.LocalStrings
 import com.example.islam.core.navigation.Screen
 import com.example.islam.domain.model.DailyQuote
@@ -85,97 +88,96 @@ fun HomeScreen(
         return
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(rememberScrollState())
-    ) {
-        // ── Top App Bar ──────────────────────────────────────────────────────
-        HomeTopBar(
-            onSettingsClick = { navController.navigate(Screen.Settings.route) }
-        )
+    // ── ViewModel state'inden görünür değerleri hazırla ──────────────────────
+    val prayerNameStr = state.nextPrayer?.prayer?.turkishName ?: "—"
 
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp)
-        ) {
-            Spacer(Modifier.height(10.dp))
-
-            // ── Konum + Hava Durumu ─────────────────────────────────────────
-            LocationWeatherRow(
-                city    = state.userPreferences.city,
-                country = state.userPreferences.country
-            )
-
-            Spacer(Modifier.height(2.dp))
-
-            // ── Tarih satırı ────────────────────────────────────────────────
-            DateRow(
-                gregorianDate = state.todayDateText,
-                hijriDate     = state.prayerTime?.hijriDate
-            )
-
-            Spacer(Modifier.height(14.dp))
-
-            // ── Ramazan banner ──────────────────────────────────────────────
-            state.daysToRamadan?.let { days ->
-                if (days > 0) {
-                    AnimatedEntrance(delayMs = 0) {
-                        RamadanBanner(days = days)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                }
-            }
-
-            // ── Namaz sayaç kartı ───────────────────────────────────────────
-            AnimatedEntrance(delayMs = 80) {
-                AnimatedContent(
-                    targetState = when {
-                        state.isLoading          -> HomeContentState.Loading
-                        state.error != null      -> HomeContentState.Error(state.error!!)
-                        state.nextPrayer != null -> HomeContentState.Success
-                        else                     -> HomeContentState.Loading
-                    },
-                    label = "home_content",
-                    transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(200)) }
-                ) { contentState ->
-                    when (contentState) {
-                        is HomeContentState.Loading -> LoadingBox()
-                        is HomeContentState.Error   -> ErrorCard(
-                            message = contentState.message,
-                            onRetry = viewModel::refresh
-                        )
-                        is HomeContentState.Success -> PrayerCountdownCard(
-                            prayerName  = state.nextPrayer!!.prayer.turkishName,
-                            countdown   = state.countdownText,
-                            prayerTime  = state.prayerTime,
-                            nextPrayer  = state.nextPrayer!!.prayer
-                        )
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            // ── Özellik kısayolları ─────────────────────────────────────────
-            AnimatedEntrance(delayMs = 160) {
-                FeatureGrid(
-                    onQiblaClick       = { navController.navigate(Screen.Qibla.route) },
-                    onPrayerTimesClick = { navController.navigate(Screen.PrayerTimes.route) },
-                    onDhikrClick       = { navController.navigate(Screen.Dhikr.route) }
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            // ── Günün Ayeti ─────────────────────────────────────────────────
-            AnimatedEntrance(delayMs = 240) {
-                state.dailyQuote?.let { DailyQuoteCard(it) }
-            }
-
-            Spacer(Modifier.height(20.dp))
+    val prayerTimeStr = state.prayerTime?.let { pt ->
+        state.nextPrayer?.let { np ->
+            pt.timeFor(np.prayer).cleanTime()
         }
+    } ?: "--:--"
+
+    val countdownStr = state.countdownText.let { raw ->
+        val parts = raw.split(":")
+        if (parts.size == 3) {
+            val h = parts[0].trimStart('0').ifEmpty { "0" }
+            val m = parts[1]
+            val s = parts[2]
+            when {
+                h != "0" -> "-${h}sa ${m}dk remaining"
+                m != "00" -> "-${m}dk ${s}sn remaining"
+                else     -> "-${s}sn remaining"
+            }
+        } else raw
     }
+
+    val gregorianStr = state.todayDateText
+    val hijriStr     = state.prayerTime?.hijriDate ?: ""
+    val verseText    = state.dailyQuote?.text
+        ?.let { "\u201C$it\u201D" }
+        ?: "\u201CVerily, in the remembrance of Allah do hearts find rest.\u201D"
+    val verseRef     = state.dailyQuote?.source ?: "Quran 13:28"
+
+    // ── Namaz vakitleri — HTML'deki icon + renk eşleşmesiyle ─────────────────
+    val activePrayerName = state.nextPrayer?.prayer?.name?.lowercase() ?: ""
+    val prayerItems = state.prayerTime?.let { pt ->
+        listOf(
+            PrayerDisplayItem(
+                name     = "Fajr",
+                time     = pt.fajr.cleanTime(),
+                icon     = androidx.compose.material.icons.Icons.Outlined.DarkMode,
+                iconTint = Color.White,
+                isActive = activePrayerName == "fajr"
+            ),
+            PrayerDisplayItem(
+                name     = "Dhuhr",
+                time     = pt.dhuhr.cleanTime(),
+                icon     = androidx.compose.material.icons.Icons.Outlined.WbSunny,
+                iconTint = Color(0xFFD4AF37),   // gold
+                isActive = activePrayerName == "dhuhr"
+            ),
+            PrayerDisplayItem(
+                name     = "Asr",
+                time     = pt.asr.cleanTime(),
+                icon     = androidx.compose.material.icons.Icons.Outlined.WbTwilight,
+                iconTint = Color(0xFFD4AF37),   // gold
+                isActive = activePrayerName == "asr"
+            ),
+            PrayerDisplayItem(
+                name     = "Maghrib",
+                time     = pt.maghrib.cleanTime(),
+                icon     = androidx.compose.material.icons.Icons.Outlined.WbTwilight,
+                iconTint = Color(0xFFFB923C),   // text-orange-400
+                isActive = activePrayerName == "maghrib"
+            ),
+            PrayerDisplayItem(
+                name     = "Isha",
+                time     = pt.isha.cleanTime(),
+                icon     = androidx.compose.material.icons.Icons.Outlined.Brightness2,
+                iconTint = Color(0xFFA5B4FC),   // text-indigo-300
+                isActive = activePrayerName == "isha"
+            )
+        )
+    } ?: defaultPrayerItems()
+
+    // ── DawnHomeScreen'i gerçek verilerle göster ─────────────────────────────
+    DawnHomeScreen(
+        prayerName      = prayerNameStr,
+        time            = prayerTimeStr,
+        countdown       = countdownStr,
+        gregorianDate   = gregorianStr,
+        hijriDate       = hijriStr,
+        verseText       = verseText,
+        verseRef        = verseRef,
+        prayerItems     = prayerItems,
+        onQiblaClick    = { navController.navigate(Screen.Qibla.route) },
+        onTasbihClick   = { navController.navigate(Screen.Dhikr.route) },
+        onHomeClick     = { /* zaten buradasın */ },
+        onQuranClick    = { /* Kuran sayfası eklenince */ },
+        onPrayersClick  = { navController.navigate(Screen.PrayerTimes.route) },
+        onSettingsClick = { navController.navigate(Screen.Settings.route) },
+        activeTab       = DawnTab.HOME
+    )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -467,7 +469,7 @@ private fun FeatureGrid(
     ) {
         FeatureCard(
             modifier    = Modifier.weight(1f),
-            icon        = Icons.Outlined.Explore,
+            iconResId   = R.drawable.kible,
             label       = strings.navQibla,
             onClick     = onQiblaClick
         )
@@ -488,10 +490,11 @@ private fun FeatureGrid(
 
 @Composable
 private fun FeatureCard(
-    modifier : Modifier = Modifier,
-    icon     : ImageVector,
-    label    : String,
-    onClick  : () -> Unit
+    modifier  : Modifier = Modifier,
+    icon      : ImageVector? = null,
+    iconResId : Int? = null,
+    label     : String,
+    onClick   : () -> Unit
 ) {
     // ADM-style: lightweight card — F5F5F5 background, 12dp radius, thin border
     Box(
@@ -519,12 +522,20 @@ private fun FeatureCard(
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector        = icon,
-                    contentDescription = null,
-                    tint               = MaterialTheme.colorScheme.primary,
-                    modifier           = Modifier.size(22.dp)
-                )
+                if (iconResId != null) {
+                    Image(
+                        painter = painterResource(iconResId),
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp)
+                    )
+                } else {
+                    Icon(
+                        imageVector        = icon!!,
+                        contentDescription = null,
+                        tint               = MaterialTheme.colorScheme.primary,
+                        modifier           = Modifier.size(22.dp)
+                    )
+                }
             }
             Spacer(Modifier.height(10.dp))
             Text(

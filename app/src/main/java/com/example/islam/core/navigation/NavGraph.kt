@@ -8,7 +8,6 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.islam.data.datastore.UserPreferencesDataStore
-import com.example.islam.presentation.dhikr.DhikrScreen
 import com.example.islam.presentation.home.HomeScreen
 import com.example.islam.presentation.onboarding.OnboardingScreen
 import com.example.islam.presentation.prayer.PrayerScreen
@@ -46,10 +45,9 @@ fun NavGraph(
             PrayerScreen()
         }
         composable(Screen.Dhikr.route) {
-            DhikrScreen()
         }
         composable(Screen.Qibla.route) {
-            QiblaScreen()
+            QiblaScreen(navController = navController)
         }
         composable(Screen.Settings.route) {
             SettingsScreen()
